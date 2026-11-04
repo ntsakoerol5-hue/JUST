@@ -25,8 +25,17 @@ Never put the service-role key in frontend code, Android builds or committed fil
 ## Vercel deployment
 Import this repository at https://vercel.com/new, select Next.js, add the two environment variables, and deploy. Future pushes to the connected branch trigger deployments.
 
+## Device pairing backend scaffold
+A one-time pairing backend is now included. After creating your Supabase project and applying `supabase/schema.sql`:
+1. Apply `supabase/migrations/20261104_device_pairing.sql` in the Supabase SQL Editor.
+2. Deploy the Edge Function with `supabase functions deploy pair-device` using the Supabase CLI.
+3. A signed-in dashboard session can call `create_device_pairing_code()` to create an eight-digit code valid for ten minutes.
+4. The companion sends the code to the `pair-device` Edge Function. The code is single-use; the function stores only a hash of the device token and returns the token once.
+
+This is backend scaffolding only: the dashboard login/code-generation UI and Android pairing screen/token storage are not yet connected. No live Supabase project has been configured or tested.
+
 ## Next integration stages
-- Add secure QR/one-time-code pairing between the Android app and the signed-in dashboard.
+- Connect the signed-in dashboard pairing UI and Android pairing screen to the one-time-code flow.
 - Add authenticated upload endpoints for owner-selected photos, files and contact data, with encryption, server-side validation, short-lived credentials and revocation.
 - Add foreground location sharing only after a clear opt-in, with a visible sharing state and stop control.
 - Add an iOS companion using Apple's PhotoKit, Contacts, document picker and Core Location permission flows.
