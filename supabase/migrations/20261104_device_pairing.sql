@@ -105,3 +105,36 @@ grant execute on function public.claim_device_pairing(text, text, text, text, te
 
 create index if not exists pairing_owner_created_idx
   on public.device_pairing_codes(owner_id, created_at desc);
+
+-- Limit pairing attempts to 10 per source IP per ten-minute bucket.
+create table if not exists public.device_pairing_attempts (
+  ip_hash text not null,
+  window_start timestamptz not null,
+  attempts integer not null default 0,
+  primary key (ip_hash, window_start)
+);
+alter table public.device_pairing_attempts enable row level security;
+
+create or replace function public.record_device_pairing_attempt(p_ip_hash text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_bucket timestamptz := to_timestamp(floor(extract(epoch from now()) / 600) * 600);
+  v_attempts integer;
+begin
+  if p_ip_hash !~ '^[a-f0-9]{64}$' then
+    raise exception 'Invalid rate-limit key';
+  end if;
+  insert into public.device_pairing_attempts(ip_hash, window_start, attempts)
+  values (p_ip_hash, v_bucket, 1)
+  on conflict (ip_hash, window_start)
+  do update set attempts = public.device_pairing_attempts.attempts + 1
+  returning attempts into v_attempts;
+  return v_attempts <= 10;
+end;
+$$;
+revoke all on function public.record_device_pairing_attempt(text) from public, anon, authenticated;
+grant execute on function public.record_device_pairing_attempt(text) to service_role;
