@@ -39,6 +39,15 @@ Deno.serve(async (req) => {
     if (!supabaseUrl || !serviceKey) throw new Error("Pairing service is not configured.");
 
     const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    const sourceIp = req.headers.get("cf-connecting-ip")
+      ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+      ?? "unknown";
+    const { data: allowed, error: limitError } = await admin.rpc("record_device_pairing_attempt", {
+      p_ip_hash: await sha256(sourceIp + ":" + serviceKey),
+    });
+    if (limitError) throw new Error("Pairing rate limit could not be checked.");
+    if (allowed !== true) throw new Error("Too many pairing attempts. Wait ten minutes and try again.");
+
     const deviceToken = randomToken();
     const { data, error } = await admin.rpc("claim_device_pairing", {
       p_code_hash: await sha256(code),
