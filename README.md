@@ -1,47 +1,44 @@
 # JUST — Private Phone Management
 
-A consent-first device-management dashboard and Android companion starter for phones that are deliberately enrolled by their owners.
+A consent-first device-management dashboard and Android companion.
 
 ## Current state
-The repository contains the initial Next.js dashboard, Supabase schema and an Android companion starter under `android/`. The Android starter can open the system photo and document pickers, request contacts/location permissions when the user taps the relevant buttons, and display basic device information. It does not upload or transmit phone data. Dashboard device cards still contain illustrative demo values only; no real phone is enrolled or monitored.
+The repository includes a Next.js dashboard with Supabase email sign-in and one-time pairing-code generation, a Supabase pairing migration and Edge Function, and an Android companion pairing screen. The Android app can submit the code and stores the returned device token using AndroidX encrypted preferences.
 
-## Run the web dashboard
-1. Install Node.js 20 or later.
-2. Run `npm install`.
-3. Copy `.env.example` to `.env.local`.
-4. Add your Supabase project URL and anon/public key.
-5. Run `npm run dev` and open http://localhost:3000.
+**No live Supabase project has been configured or tested.** The app currently registers a device only; photos, files, contacts and location are not uploaded to the dashboard. Local picker/permission demonstrations are not data synchronisation.
 
-## Open the Android companion
-Open the `android/` folder in Android Studio, allow Gradle sync, then run the `app` configuration on an Android 8.0+ test device. See [android/README.md](android/README.md) for included functionality and limitations. This starter has not yet been built or tested on a physical device.
+## Configure Supabase
+1. Create a Supabase project.
+2. Run `supabase/schema.sql` in the SQL Editor.
+3. Run `supabase/migrations/20261104_device_pairing.sql`.
+4. Set the dashboard environment variables `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+5. Deploy the function from the repository root using the Supabase CLI: `supabase functions deploy pair-device`.
+6. Ensure email authentication is enabled and configure the allowed redirect URLs.
 
-## Supabase setup
-1. Create a project at https://supabase.com.
-2. Open SQL Editor and run `supabase/schema.sql`.
-3. Configure email authentication and secure redirect URLs.
-4. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in local and Vercel environments.
-Never put the service-role key in frontend code, Android builds or committed files.
+The pairing Edge Function uses the server-side `SUPABASE_SERVICE_ROLE_KEY` supplied by Supabase. Never copy that key into the browser, Android app, or Git repository. The function is configured with JWT verification disabled because the one-time random pairing code is its credential; the Supabase public API key remains required in the `apikey` header.
 
-## Vercel deployment
-Import this repository at https://vercel.com/new, select Next.js, add the two environment variables, and deploy. Future pushes to the connected branch trigger deployments.
+## Configure and run Android
+1. Open the `android/` folder in Android Studio.
+2. Create `android/local.properties` with the Supabase project URL and public anon/publishable key:
 
-## Device pairing backend scaffold
-A one-time pairing backend is now included. After creating your Supabase project and applying `supabase/schema.sql`:
-1. Apply `supabase/migrations/20261104_device_pairing.sql` in the Supabase SQL Editor.
-2. Deploy the Edge Function with `supabase functions deploy pair-device` using the Supabase CLI.
-3. A signed-in dashboard session can call `create_device_pairing_code()` to create an eight-digit code valid for ten minutes.
-4. The companion sends the code to the `pair-device` Edge Function. The code is single-use; the function stores only a hash of the device token and returns the token once.
+```properties
+JUST_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+JUST_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY
+```
 
-This is backend scaffolding only: the dashboard login/code-generation UI and Android pairing screen/token storage are not yet connected. No live Supabase project has been configured or tested.
+3. Sync Gradle and run the app on an Android 8.0+ test device.
+4. Sign in to the JUST dashboard, generate a pairing code, and enter it in the companion app.
+
+`android/local.properties` is ignored by Git. Use only a public anon/publishable key in the mobile app.
+
+## Run the dashboard
+Install Node.js 20+, run `npm install`, copy `.env.example` to `.env.local`, set the two public Supabase variables, then run `npm run dev`.
 
 ## Next integration stages
-- Connect the signed-in dashboard pairing UI and Android pairing screen to the one-time-code flow.
-- Add authenticated upload endpoints for owner-selected photos, files and contact data, with encryption, server-side validation, short-lived credentials and revocation.
-- Add foreground location sharing only after a clear opt-in, with a visible sharing state and stop control.
-- Add an iOS companion using Apple's PhotoKit, Contacts, document picker and Core Location permission flows.
-- For company-owned Android devices, investigate Android Enterprise managed-device enrolment and a properly configured device-policy controller.
+- Load real paired-device records in the dashboard and add server-side revoke controls.
+- Add authenticated, encrypted upload endpoints for files/photos and selected contact exports.
+- Add clear, revocable foreground location sharing.
+- Build the iOS companion using Apple's approved system frameworks.
 
 ## Security and platform limits
-Android and iOS intentionally restrict access to private phone data. JUST does not bypass permissions, silently extract messages/calls, hide its presence, activate sensors covertly, or control a personal phone without the owner's approval. Android Enterprise and Apple MDM are legitimate management frameworks, not permission-bypass mechanisms. Owners must be able to see, limit and revoke sharing.
-
-Before production, add verified device identity, signed short-lived ingestion tokens, server-side validation, rate limits, retention controls, MFA and independent security review.
+Android and iOS restrict access to private phone data. JUST does not bypass permissions, secretly extract messages/calls, hide its presence, activate sensors covertly, or control personal phones without the owner's approval. The companion must make sharing visible and revocable. Before production, add rate limits, verified device identity, token rotation, upload validation, retention controls, MFA and independent security review.
