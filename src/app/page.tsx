@@ -12,6 +12,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [pairingCode, setPairingCode] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const [devices, setDevices] = useState<Array<{id:string;display_name:string;platform:string;status:string;os_version:string|null;battery_percent:number|null;last_seen_at:string|null}>>([]);
 
   useEffect(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -23,6 +24,17 @@ export default function Home() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!client || !user) { setDevices([]); return; }
+    client.from("devices")
+      .select("id,display_name,platform,status,os_version,battery_percent,last_seen_at")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) setMessage(error.message);
+        else setDevices(data ?? []);
+      });
+  }, [client, user]);
 
   async function authenticate(mode: "sign-in" | "sign-up") {
     if (!client) return;
@@ -77,7 +89,15 @@ export default function Home() {
           {pairingCode && <div className="pairCode"><span>ONE-TIME PAIRING CODE</span><strong>{pairingCode}</strong><small>{expiresAt ? "Expires: " + new Date(expiresAt).toLocaleString() : "Expires in 10 minutes"}</small></div>}
           <p className="muted">Codes expire after 10 minutes and can only be used once. Keep the code private and enter it only on the phone you intend to enrol.</p>
         </section>
-        <section className="getting"><h2>Connected devices</h2><p className="muted">Your enrolled devices will be listed here after the companion pairing flow is completed.</p><div className="notice"><span>No devices loaded yet. This dashboard does not display demo device information as real data.</span></div></section>
+        <section className="getting"><h2>Connected devices</h2><p className="muted">Live records registered to your account.</p>
+          {devices.length === 0 ? <div className="notice"><span>No devices are paired to this account yet.</span></div> :
+            <div className="pairedDevices">{devices.map(device => <article className="device" key={device.id}>
+              <div className="deviceTop"><div className="deviceIcon">{device.platform === "android" ? "◈" : "▯"}</div><span className="tag">{device.status}</span></div>
+              <h3>{device.display_name}</h3><p className="muted">{device.platform.toUpperCase()} · {device.os_version || "OS version not reported"}</p>
+              <div className="deviceInfo"><span>Battery</span><b>{device.battery_percent == null ? "Not reported" : device.battery_percent + "%"}</b><span>Last seen</span><b>{device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : "Not available"}</b></div>
+              <small className="muted">Device ID: {device.id}</small>
+            </article>)}</div>}
+        </section>
         <button className="secondary" onClick={signOut}>Sign out</button>
       </>}
       {message && <p className="statusMessage" role="status">{message}</p>}
