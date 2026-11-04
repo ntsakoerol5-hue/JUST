@@ -1,0 +1,4 @@
+[functions.pair-device]
+# The pairing code is a random, short-lived, single-use credential validated server-side.
+# Supabase still requires the public anon/publishable key in the apikey header.
+verify_jwt = false
