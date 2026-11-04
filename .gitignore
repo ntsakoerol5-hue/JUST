@@ -5,3 +5,8 @@ out
 !.env.example
 .vercel
 *.log
+
+# Android local configuration and build output
+local.properties
+**/build/
+.idea/
